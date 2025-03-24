@@ -1,10 +1,17 @@
 from typing import Optional, List
 from datetime import datetime
 import os
+from youtube_transcript_api import YouTubeTranscriptApi
+from google import genai
 
 import uvicorn
 from fastapi import Depends, FastAPI, HTTPException
 from sqlmodel import Field, Relationship, Session, SQLModel, create_engine
+
+from dotenv import load_dotenv
+load_dotenv()
+
+client = genai.Client(api_key=os.getenv("GENAI_API_KEY"))
 
 # PostgreSQL Database URL
 DATABASE_URL = 'postgresql://testuser:test1234!@localhost:5432/yt-task-maker'
@@ -49,20 +56,176 @@ def get_session():
 
 # CRUD Routes
 @app.post("/pages/", response_model=Pages)
-def create_page(page: Pages, session: Session = Depends(get_session)):
-    session.add(page)
-    session.commit()
-    session.refresh(page)
-    return page
+def create_page(vid_id: str, session: Session = Depends(get_session)):
+    try:
+        # Fetch transcript
+        fetched_transcript = YouTubeTranscriptApi().fetch(vid_id)
+        text = ""
+
+        for snippet in fetched_transcript:
+            text = text + snippet.text + " "
+
+        # Generate task list using Gemini API
+        response = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=text + "\n" + "the above paragraph is a transcript of a youtube video with this give me a list of tasks in the sperated with comma just a task no need other things so i can use it in my frontend and these tasks should be useful , if transcript not related to task kind of thing just tell me it cant be created and dont give task if the transcript is not related to task kind of thing dont need anything else , just the list sperated with comma ",
+        )
+
+        # Extract response text
+        response_text = response.text.strip()
+
+        # Check if the response contains a valid list or if tasks cannot be created
+        if "can't be created" in response_text.lower():
+            task_list = []
+        else:
+            # Split the response text by commas to create task list
+            task_list = [task.strip() for task in response_text.split(",")]
+
+        # If no tasks are created, return an empty page with no tasks
+        if not task_list:
+            return {"detail": "No tasks created from the transcript."}
+
+        # Create a new Page entry
+        new_page = Pages(vid_id=vid_id)
+
+        # Create individual task entries and associate them with the new page
+        for task_desc in task_list:
+            if task_desc:  # Ensure there's a non-empty task description
+                new_task = Tasks(
+                    task_description=task_desc,  # Task description
+                    task_status=False,  # Default task status to False (incomplete)
+                    page_id=new_page.id  # Link to the page via page_id
+                )
+                new_page.tasks.append(new_task)
+
+        # Add the new page with associated tasks to the session
+        session.add(new_page)
+        session.commit()
+        session.refresh(new_page)
+
+        return new_page
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/getpages", response_model=List[Pages])
+def get_pages(session: Session = Depends(get_session)):
+    try:
+        pages = session.query(Pages).all()
+        return pages
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/tasks/by_page/{vid_id}", response_model=List[Tasks])
+def get_tasks_by_page(vid_id: str, session: Session = Depends(get_session)):
+    try:
+        # Fetch the page to ensure it exists
+        page = session.query(Pages).filter(Pages.vid_id == vid_id).first()
+        if not page:
+            raise HTTPException(status_code=404, detail="Page not found")
+
+        # Fetch all tasks associated with the page by page_id
+        tasks = session.query(Tasks).filter(Tasks.page_id == page.id).all()
+
+        # If no tasks are found, return a message
+        if not tasks:
+            raise HTTPException(status_code=404, detail="No tasks found for this page")
+
+        return tasks
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/pages/{vid_id}", response_model=Pages)
+def delete_page(vid_id: str, session: Session = Depends(get_session)):
+    try:
+        # Fetch the page by its vid_id
+        page = session.query(Pages).filter(Pages.vid_id == vid_id).first()
+
+        # If the page doesn't exist, raise a 404 error
+        if not page:
+            raise HTTPException(status_code=404, detail="Page not found")
+
+        # Optionally, delete all associated tasks and notes
+        # Delete tasks related to this page
+        for task in page.tasks:
+            session.delete(task)
+
+        # Delete notes related to this page
+        for note in page.notes:
+            session.delete(note)
+
+        # Now delete the page
+        session.delete(page)
+
+        # Commit the changes to the database
+        session.commit()
+
+        # Optionally return the deleted page object (if needed)
+        return page
+
+    except Exception as e:
+        # If any error occurs, return a 500 server error
+        raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/tasks/", response_model=Tasks)
-def create_task(task: Tasks, session: Session = Depends(get_session)):
-    session.add(task)
-    session.commit()
-    session.refresh(task)
+@app.put("/tasks/{task_id}", response_model=Tasks)
+def update_task(task_id: int, task_update: Tasks, session: Session = Depends(get_session)):
+    try:
+        # Fetch the task by task_id
+        task = session.get(Tasks, task_id)
+
+        # If the task doesn't exist, raise a 404 error
+        if not task:
+            raise HTTPException(status_code=404, detail="Task not found")
+
+        # Update the task's fields if they are not None
+        if task_update.task_description is not None:
+            task.task_description = task_update.task_description
+        if task_update.task_status is not None:
+            task.task_status = task_update.task_status
+
+        # Commit the changes to the database
+        session.commit()
+        session.refresh(task)  # Ensure the task object is up-to-date
+
+        return task  # Return the updated task
+
+    except Exception as e:
+        # Catch any other exceptions and return a 500 error
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/tasks/{task_id}", response_model=Tasks)
+def delete_task(task_id: int, session: Session = Depends(get_session)):
+    try:
+        # Fetch the task by its ID
+        task = session.get(Tasks, task_id)
+
+        # If the task doesn't exist, raise a 404 error
+        if not task:
+            raise HTTPException(status_code=404, detail="Task not found")
+
+        # Delete the task
+        session.delete(task)
+
+        # Commit the transaction
+        session.commit()
+
+        # Optionally return the deleted task (if you want to show what was deleted)
+        return task
+
+    except Exception as e:
+        # If any error occurs, return a 500 server error
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
+@app.get("/gettasks/{task_id}",response_model=Tasks)
+def get_task(task_id: int, session: Session = Depends(get_session)):
+    task = session.query(Tasks).filter(Tasks.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
     return task
-
 
 @app.post("/notes/", response_model=Notes)
 def create_note(note: Notes, session: Session = Depends(get_session)):
@@ -72,20 +235,14 @@ def create_note(note: Notes, session: Session = Depends(get_session)):
     return note
 
 
-@app.get("/pages/{page_id}", response_model=Pages)
-def get_page(page_id: int, session: Session = Depends(get_session)):
-    page = session.get(Pages, page_id)
+@app.get("/pages/{vid_id}", response_model=Pages)
+def get_page(vid_id: str, session: Session = Depends(get_session)):
+    page = session.query(Pages).filter(Pages.vid_id == vid_id).first()  # Use filter instead of get()
     if not page:
         raise HTTPException(status_code=404, detail="Page not found")
     return page
 
 
-@app.get("/tasks/{task_id}", response_model=Tasks)
-def get_task(task_id: int, session: Session = Depends(get_session)):
-    task = session.get(Tasks, task_id)
-    if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
-    return task
 
 
 @app.get("/notes/{note_id}", response_model=Notes)
@@ -98,4 +255,4 @@ def get_note(note_id: int, session: Session = Depends(get_session)):
 
 # Run the Application
 if __name__ == "__main__":
-    uvicorn.run(app, host="127.0.0.1", port=8080)
+    uvicorn.run(app, host="127.0.0.1", port=8000)
