@@ -21,7 +21,6 @@ engine = create_engine(DATABASE_URL, echo=True)
 class Pages(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     vid_id: str
-    title: Optional[str] = Field(default=None)
     time_created: datetime = Field(default_factory=datetime.utcnow)
 
     tasks: List["Tasks"] = Relationship(back_populates="page")
@@ -56,11 +55,6 @@ def get_session():
 @app.post("/create-page/", response_model=Pages)
 def create_page(vid_id: str, session: Session = Depends(get_session)):
     try:
-        split_index = vid_id.find("=")
-
-        if split_index != -1:
-            vid_id = vid_id[split_index + 1: split_index + 12]
-        
         # Fetch transcript
         fetched_transcript = YouTubeTranscriptApi().fetch(vid_id)
         text = ""
@@ -83,16 +77,13 @@ def create_page(vid_id: str, session: Session = Depends(get_session)):
         else:
             # Split the response text by commas to create task list
             task_list = [task.strip() for task in response_text.split(",")]
-            
 
         # If no tasks are created, return an empty page with no tasks
         if not task_list:
             return {"detail": "No tasks created from the transcript."}
-        
-        title = vid_id
 
         # Create a new Page entry
-        new_page = Pages(vid_id=vid_id,title=title)
+        new_page = Pages(vid_id=vid_id)
 
         # Create individual task entries and associate them with the new page
         for task_desc in task_list:
@@ -112,30 +103,6 @@ def create_page(vid_id: str, session: Session = Depends(get_session)):
         return new_page
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.put("/{vid_id}/update-title", response_model=Pages)
-def update_page_title(vid_id: str, title_update: dict, session: Session = Depends(get_session)):
-    try:
-        # Fetch the page using the vid_id
-        page = session.query(Pages).filter(Pages.vid_id == vid_id).first()
-
-        # If the page doesn't exist, raise a 404 error
-        if not page:
-            raise HTTPException(status_code=404, detail="Page not found")
-
-        # Update the title of the page
-        if "title" in title_update:
-            page.title = title_update["title"]
-
-        # Commit the changes to the database
-        session.commit()
-        session.refresh(page)  # Ensure the page object is up-to-date
-
-        return page  # Return the updated page
-
-    except Exception as e:
-        # Catch any other exceptions and return a 500 error
         raise HTTPException(status_code=500, detail=str(e))
 
 
