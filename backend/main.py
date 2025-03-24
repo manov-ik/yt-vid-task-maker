@@ -44,7 +44,6 @@ class Notes(SQLModel, table=True):
 
     page: Pages = Relationship(back_populates="notes")
 
-
 # Initialize FastAPI App
 app = FastAPI()
 
@@ -53,9 +52,7 @@ def get_session():
     with Session(engine) as session:
         yield session
 
-
-# CRUD Routes
-@app.post("/pages/", response_model=Pages)
+@app.post("/create-page/", response_model=Pages)
 def create_page(vid_id: str, session: Session = Depends(get_session)):
     try:
         # Fetch transcript
@@ -108,7 +105,8 @@ def create_page(vid_id: str, session: Session = Depends(get_session)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/getpages", response_model=List[Pages])
+
+@app.get("/get-pages", response_model=List[Pages])
 def get_pages(session: Session = Depends(get_session)):
     try:
         pages = session.query(Pages).all()
@@ -116,27 +114,7 @@ def get_pages(session: Session = Depends(get_session)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/tasks/by_page/{vid_id}", response_model=List[Tasks])
-def get_tasks_by_page(vid_id: str, session: Session = Depends(get_session)):
-    try:
-        # Fetch the page to ensure it exists
-        page = session.query(Pages).filter(Pages.vid_id == vid_id).first()
-        if not page:
-            raise HTTPException(status_code=404, detail="Page not found")
-
-        # Fetch all tasks associated with the page by page_id
-        tasks = session.query(Tasks).filter(Tasks.page_id == page.id).all()
-
-        # If no tasks are found, return a message
-        if not tasks:
-            raise HTTPException(status_code=404, detail="No tasks found for this page")
-
-        return tasks
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.delete("/pages/{vid_id}", response_model=Pages)
+@app.delete("/delete-page/{vid_id}", response_model=Pages)
 def delete_page(vid_id: str, session: Session = Depends(get_session)):
     try:
         # Fetch the page by its vid_id
@@ -168,8 +146,34 @@ def delete_page(vid_id: str, session: Session = Depends(get_session)):
         # If any error occurs, return a 500 server error
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/{vid_id}/get-tasks", response_model=List[Tasks])
+def get_tasks_by_page(vid_id: str, session: Session = Depends(get_session)):
+    try:
+        # Fetch the page to ensure it exists
+        page = session.query(Pages).filter(Pages.vid_id == vid_id).first()
+        if not page:
+            raise HTTPException(status_code=404, detail="Page not found")
 
-@app.put("/tasks/{task_id}", response_model=Tasks)
+        # Fetch all tasks associated with the page by page_id
+        tasks = session.query(Tasks).filter(Tasks.page_id == page.id).all()
+
+        # If no tasks are found, return a message
+        if not tasks:
+            raise HTTPException(status_code=404, detail="No tasks found for this page")
+
+        return tasks
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/get-task/{task_id}",response_model=Tasks)
+def get_task(task_id: int, session: Session = Depends(get_session)):
+    task = session.query(Tasks).filter(Tasks.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return task
+
+@app.put("/upd-task/{task_id}", response_model=Tasks)
 def update_task(task_id: int, task_update: Tasks, session: Session = Depends(get_session)):
     try:
         # Fetch the task by task_id
@@ -195,7 +199,7 @@ def update_task(task_id: int, task_update: Tasks, session: Session = Depends(get
         # Catch any other exceptions and return a 500 error
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.delete("/tasks/{task_id}", response_model=Tasks)
+@app.delete("/del-task/{task_id}", response_model=Tasks)
 def delete_task(task_id: int, session: Session = Depends(get_session)):
     try:
         # Fetch the task by its ID
@@ -218,39 +222,101 @@ def delete_task(task_id: int, session: Session = Depends(get_session)):
         # If any error occurs, return a 500 server error
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/{vid_id}/create-note/", response_model=Notes)
+def create_note(vid_id: str, note: Notes, session: Session = Depends(get_session)):
+    try:
+        # Fetch the page using the vid_id
+        page = session.query(Pages).filter(Pages.vid_id == vid_id).first()
+
+        # If the page doesn't exist, raise a 404 error
+        if not page:
+            raise HTTPException(status_code=404, detail="Page not found")
+
+        # Create a new note associated with the page
+        new_note = Notes(
+            note_description=note.note_description,
+            page_id=page.id  # Set the page_id to associate the note with the page
+        )
+
+        # Add the note to the session and commit
+        session.add(new_note)
+        session.commit()
+        session.refresh(new_note)
+
+        return new_note
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/gettasks/{task_id}",response_model=Tasks)
-def get_task(task_id: int, session: Session = Depends(get_session)):
-    task = session.query(Tasks).filter(Tasks.id == task_id).first()
-    if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
-    return task
+@app.get("/{vid_id}/get-notes", response_model=List[Notes])
+def get_notes_by_vid_id(vid_id: str, session: Session = Depends(get_session)):
+    try:
+        # Fetch the page using the vid_id
+        page = session.query(Pages).filter(Pages.vid_id == vid_id).first()
 
-@app.post("/notes/", response_model=Notes)
-def create_note(note: Notes, session: Session = Depends(get_session)):
-    session.add(note)
-    session.commit()
-    session.refresh(note)
-    return note
+        # If the page doesn't exist, raise a 404 error
+        if not page:
+            raise HTTPException(status_code=404, detail="Page not found")
 
+        # Fetch all notes associated with the page
+        notes = session.query(Notes).filter(Notes.page_id == page.id).all()
 
-@app.get("/pages/{vid_id}", response_model=Pages)
-def get_page(vid_id: str, session: Session = Depends(get_session)):
-    page = session.query(Pages).filter(Pages.vid_id == vid_id).first()  # Use filter instead of get()
-    if not page:
-        raise HTTPException(status_code=404, detail="Page not found")
-    return page
+        # If no notes are found, return a message
+        if not notes:
+            raise HTTPException(status_code=404, detail="No notes found for this page")
 
+        return notes
 
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
+@app.put("/update-note/{note_id}", response_model=Notes)
+def update_note(note_id: int, note_update: Notes, session: Session = Depends(get_session)):
+    try:
+        # Fetch the note by its ID
+        note = session.get(Notes, note_id)
 
-@app.get("/notes/{note_id}", response_model=Notes)
-def get_note(note_id: int, session: Session = Depends(get_session)):
-    note = session.get(Notes, note_id)
-    if not note:
-        raise HTTPException(status_code=404, detail="Note not found")
-    return note
+        # If the note doesn't exist, raise a 404 error
+        if not note:
+            raise HTTPException(status_code=404, detail="Note not found")
+
+        # Update the note's fields if they are provided in the request
+        if note_update.note_description is not None:
+            note.note_description = note_update.note_description
+
+        # Commit the changes to the database
+        session.commit()
+        session.refresh(note)  # Ensure the note object is up-to-date
+
+        return note  # Return the updated note
+
+    except Exception as e:
+        # Catch any other exceptions and return a 500 error
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/delete-note/{note_id}", response_model=Notes)
+def delete_note(note_id: int, session: Session = Depends(get_session)):
+    try:
+        # Fetch the note by its ID
+        note = session.get(Notes, note_id)
+
+        # If the note doesn't exist, raise a 404 error
+        if not note:
+            raise HTTPException(status_code=404, detail="Note not found")
+
+        # Delete the note
+        session.delete(note)
+
+        # Commit the transaction
+        session.commit()
+
+        # Return the deleted note (optional)
+        return note
+
+    except Exception as e:
+        # If any error occurs, return a 500 server error
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # Run the Application
