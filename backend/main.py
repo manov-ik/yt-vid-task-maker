@@ -14,7 +14,8 @@ load_dotenv()
 client = genai.Client(api_key=os.getenv("GENAI_API_KEY"))
 
 # PostgreSQL Database URL
-DATABASE_URL = 'postgresql://testuser:test1234!@localhost:5432/yt-task-maker'
+DATABASE_URL = 'postgresql://yt-task-maker_owner:npg_LQrOX1zZ7tiI@ep-yellow-frost-a18rhtm7-pooler.ap-southeast-1.aws.neon.tech/yt-task-maker?sslmode=require'
+# DATABASE_URL = 'postgresql://testuser:test1234!@localhost:5432/yt-task-maker'
 engine = create_engine(DATABASE_URL, echo=True)
 
 # Define Models
