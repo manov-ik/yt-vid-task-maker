@@ -6,7 +6,7 @@ from google import genai
 
 import uvicorn
 from fastapi import Depends, FastAPI, HTTPException
-from sqlmodel import Field, Relationship, Session, SQLModel, create_engine
+from sqlmodel import Field, Relationship, Session, SQLModel, create_engine , delete
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -54,12 +54,12 @@ def get_session():
         yield session
 
 @app.post("/create-page/", response_model=Pages)
-def create_page(vid_id: str, session: Session = Depends(get_session)):
+def create_page(vid_url: str, session: Session = Depends(get_session)):
     try:
-        split_index = vid_id.find("=")
+        split_index = vid_url.find("=")
 
         if split_index != -1:
-            vid_id = vid_id[split_index + 1: split_index + 12]
+            vid_id = vid_url[split_index + 1: split_index + 12]
         
         # Fetch transcript
         fetched_transcript = YouTubeTranscriptApi().fetch(vid_id)
@@ -71,12 +71,19 @@ def create_page(vid_id: str, session: Session = Depends(get_session)):
         # Generate task list using Gemini API
         response = client.models.generate_content(
             model="gemini-2.0-flash",
-            contents=text + "\n" + "the above paragraph is a transcript of a youtube video with this give me a list of tasks in the sperated with comma just a task no need other things so i can use it in my frontend and these tasks should be useful , if transcript not related to task kind of thing just tell me it cant be created and dont give task if the transcript is not related to task kind of thing dont need anything else , just the list sperated with comma ",
+            contents=text + "\n" + "the above paragraph is a transcript of a youtube video with this give me a list of tasks in the sperated with comma just a task no need other things so i can use it in my frontend and these tasks should be useful , if transcript not related to task kind of thing just tell me it cant be created and dont give task if the transcript is not related to task kind of thing dont need anything else , just the list of tasks sperated with comma and max of 10 tasks and one thing more dont give any comma inbetween a task  ",
+        )
+        
+        
+        title = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=text + "\n" + "give me a title for this in 2 words or less give as a normal text only no bold or anything else just the title",
         )
 
         # Extract response text
         response_text = response.text.strip()
-
+        title = title.text.strip()
+        
         # Check if the response contains a valid list or if tasks cannot be created
         if "can't be created" in response_text.lower():
             task_list = []
@@ -89,7 +96,6 @@ def create_page(vid_id: str, session: Session = Depends(get_session)):
         if not task_list:
             return {"detail": "No tasks created from the transcript."}
         
-        title = vid_id
 
         # Create a new Page entry
         new_page = Pages(vid_id=vid_id,title=title)
@@ -350,7 +356,18 @@ def delete_note(note_id: int, session: Session = Depends(get_session)):
     except Exception as e:
         # If any error occurs, return a 500 server error
         raise HTTPException(status_code=500, detail=str(e))
-
+    
+@app.delete("/delete-all/",responses={200: {"description": "Successfully Deleted"}, 404: {"description": "Not Found"}})
+def delete_all_data(session: Session = Depends(get_session)):
+    try:
+        # Delete all data from the database
+        session.exec(delete(Tasks))
+        session.exec(delete(Notes))
+        session.exec(delete(Pages))  
+        session.commit()
+        return {"description": "Successfully Deleted"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # Run the Application
 if __name__ == "__main__":
