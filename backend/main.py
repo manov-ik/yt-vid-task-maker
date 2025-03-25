@@ -72,7 +72,7 @@ def create_page(vid_url: str, session: Session = Depends(get_session)):
         # Generate task list using Gemini API
         response = client.models.generate_content(
             model="gemini-2.0-flash",
-            contents=text + "\n" + "the above paragraph is a transcript of a youtube video with this give me a list of tasks in the sperated with comma just a task no need other things so i can use it in my frontend and these tasks should be useful , if transcript not related to task kind of thing just tell me it cant be created and dont give task if the transcript is not related to task kind of thing dont need anything else , just the list of tasks sperated with comma and max of 10 tasks and one thing more dont give any comma inbetween a task  ",
+            contents=text + "\n" + "Given the youtube transcipt, provide me with a list of actionable items/tasks from the youtube videos for me to implement in my daily life as a student. Seperate these items by commas. Provide only the list of tasks, max 10",
         )
         
         
@@ -83,6 +83,7 @@ def create_page(vid_url: str, session: Session = Depends(get_session)):
 
         # Extract response text
         response_text = response.text.strip()
+        print(response_text)
         title = title.text.strip()
         
         # Check if the response contains a valid list or if tasks cannot be created
