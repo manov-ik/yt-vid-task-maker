@@ -1,0 +1,33 @@
+@import "tailwindcss";
+.custom-scrollbar::-webkit-scrollbar {
+  width: 0px; /* Effectively hides the scrollbar */
+  height: 0px;
+  display:none;
+}
+
+
+
+
+.scroll-container {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+}
+
+.scroll-container::-webkit-scrollbar {
+  width: 8px;
+}
+
+.scroll-container::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  margin: 4px 0;
+}
+
+.scroll-container::-webkit-scrollbar-track {
+  background: transparent;
+  margin: 4px 0;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+}
