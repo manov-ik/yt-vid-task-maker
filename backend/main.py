@@ -7,11 +7,13 @@ from google import genai
 import uvicorn
 from fastapi import Depends, FastAPI, HTTPException
 from sqlmodel import Field, Relationship, Session, SQLModel, create_engine , delete
+from fastapi.middleware.cors import CORSMiddleware
 
 from dotenv import load_dotenv
 load_dotenv()
 
 client = genai.Client(api_key=os.getenv("GENAI_API_KEY"))
+
 
 # PostgreSQL Database URL
 DATABASE_URL = 'postgresql://yt-task-maker_owner:npg_LQrOX1zZ7tiI@ep-yellow-frost-a18rhtm7-pooler.ap-southeast-1.aws.neon.tech/yt-task-maker?sslmode=require'
@@ -48,6 +50,8 @@ class Notes(SQLModel, table=True):
 
 # Initialize FastAPI App
 app = FastAPI()
+origin = {'http://localhost:5173'}
+app.add_middleware(CORSMiddleware,allow_origins=origin)
 
 # Dependency for DB Session
 def get_session():
@@ -72,13 +76,16 @@ def create_page(vid_url: str, session: Session = Depends(get_session)):
         # Generate task list using Gemini API
         response = client.models.generate_content(
             model="gemini-2.0-flash",
-            contents=text + "\n" + "Given the youtube transcipt, provide me with a list of actionable items/tasks from the youtube videos for me to implement in my daily life as a student. Seperate these items by commas. Provide only the list of tasks, max 10",
+            contents=text + "\n" + """ Given the youtube transcipt, provide me with a list of actionable items/tasks from 
+            the youtube videos for me to implement in my daily life as a student. Seperate these items by commas. dont use any commas
+            inbetween the tasks.Provide only the list of tasks, max 10 """,
         )
         
         
         title = client.models.generate_content(
             model="gemini-2.0-flash",
-            contents=text + "\n" + "give me a title for this in 2 words or less give as a normal text only no bold or anything else just the title",
+            contents=text + "\n" + """ give me a title for this in 2 words or less give as a normal text only no bold 
+            or anything else just the title """,
         )
 
         # Extract response text
