@@ -65,69 +65,73 @@ def create_page(vid_url: str, session: Session = Depends(get_session)):
 
         if split_index != -1:
             vid_id = vid_url[split_index + 1: split_index + 12]
+            
+        # Check if the page already exists with the given vid_id
+        existing_page = session.query(Pages).filter(Pages.vid_id == vid_id).first()
         
-        # Fetch transcript
-        fetched_transcript = YouTubeTranscriptApi().fetch(vid_id)
-        text = ""
-
-        for snippet in fetched_transcript:
-            text = text + snippet.text + " "
-
-        # Generate task list using Gemini API
-        response = client.models.generate_content(
-            model="gemini-2.0-flash",
-            contents=text + "\n" + """ Given the youtube transcipt, provide me with a list of actionable items/tasks from 
-            the youtube videos for me to implement in my daily life as a student. Seperate these items by commas. dont use any commas
-            inbetween the tasks.Provide only the list of tasks, max 10 """,
-        )
-        
-        
-        title = client.models.generate_content(
-            model="gemini-2.0-flash",
-            contents=text + "\n" + """ give me a title for this in 2 words or less give as a normal text only no bold 
-            or anything else just the title """,
-        )
-
-        # Extract response text
-        response_text = response.text.strip()
-        print(response_text)
-        title = title.text.strip()
-        
-        # Check if the response contains a valid list or if tasks cannot be created
-        if "can't be created" in response_text.lower():
-            task_list = []
+        # If the page already exists, raise an HTTPException with a message
+        if existing_page:
+            raise HTTPException(status_code=400, detail="Page with this video ID already exists")
         else:
-            # Split the response text by commas to create task list
-            task_list = [task.strip() for task in response_text.split(",")]
+        
+            # Fetch transcript
+            fetched_transcript = YouTubeTranscriptApi().fetch(vid_id)
+            text = ""
+
+            for snippet in fetched_transcript:
+                text = text + snippet.text + " "
+
+            # Generate task list using Gemini API
+            response = client.models.generate_content(
+                model="gemini-2.0-flash",
+                contents=text + "\n" + "the above paragraph is a transcript of a youtube video with this give me a list of tasks in the sperated with comma just a task no need other things so i can use it in my frontend and these tasks should be useful , if transcript not related to task kind of thing just tell me it cant be created and dont give task if the transcript is not related to task kind of thing dont need anything else , just the list of tasks sperated with comma and max of 10 tasks and one thing more dont give any comma inbetween a task  ",
+            )
+            
+            
+            title = client.models.generate_content(
+                model="gemini-2.0-flash",
+                contents=text + "\n" + "give me a title for this in 2 words or less give as a normal text only no bold or anything else just the title",
+            )
+
+            # Extract response text
+            response_text = response.text.strip()
+            title = title.text.strip()
+            
+            # Check if the response contains a valid list or if tasks cannot be created
+            if "can't be created" in response_text.lower():
+                task_list = []
+            else:
+                # Split the response text by commas to create task list
+                task_list = [task.strip() for task in response_text.split(",")]
+                
+
+            # If no tasks are created, return an empty page with no tasks
+            if not task_list:
+                return {"detail": "No tasks created from the transcript."}
             
 
-        # If no tasks are created, return an empty page with no tasks
-        if not task_list:
-            return {"detail": "No tasks created from the transcript."}
-        
+            # Create a new Page entry
+            new_page = Pages(vid_id=vid_id,title=title)
 
-        # Create a new Page entry
-        new_page = Pages(vid_id=vid_id,title=title)
+            # Create individual task entries and associate them with the new page
+            for task_desc in task_list:
+                if task_desc:  # Ensure there's a non-empty task description
+                    new_task = Tasks(
+                        task_description=task_desc,  # Task description
+                        task_status=False,  # Default task status to False (incomplete)
+                        page_id=new_page.id  # Link to the page via page_id
+                    )
+                    new_page.tasks.append(new_task)
 
-        # Create individual task entries and associate them with the new page
-        for task_desc in task_list:
-            if task_desc:  # Ensure there's a non-empty task description
-                new_task = Tasks(
-                    task_description=task_desc,  # Task description
-                    task_status=False,  # Default task status to False (incomplete)
-                    page_id=new_page.id  # Link to the page via page_id
-                )
-                new_page.tasks.append(new_task)
+            # Add the new page with associated tasks to the session
+            session.add(new_page)
+            session.commit()
+            session.refresh(new_page)
 
-        # Add the new page with associated tasks to the session
-        session.add(new_page)
-        session.commit()
-        session.refresh(new_page)
-
-        return new_page
-
+            return new_page
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
 
 @app.put("/{vid_id}/update-title", response_model=Pages)
 def update_page_title(vid_id: str, title_update: dict, session: Session = Depends(get_session)):
