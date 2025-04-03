@@ -38,7 +38,7 @@ const Home = ()=>{
        
     }
     
-    return <div className=" bg-black max-w-full w-screen text-[#006A67] ">
+    return <div className=" bg-black  w-full text-[#006A67] min-h-full ">
         <div className="p-10 min-h-30 ">
             <div class=" h-10 max-w-full rounded-full flex justify-between min-w-[600px]">
                  <span className="font-bold tracking-[1px] text-[#006A67] text-2xl ml-10 align-bottom flex flex-col h-9 justify-center">
@@ -55,18 +55,18 @@ const Home = ()=>{
                  </div>
             </div>
         </div>
-        <main className="">
-            <section className="px-40 overflow-y-auto h-full break-words">
-              <section className="px-10 pb-10 h-[850px] grid grid-flow-row auto-rows-min  gap-2">
+        <main className="flex justify-center">
+            <section className=" flex flex-col w-[80%] min-h-screen">
+              <section className="pb-10 flex  gap-4">
                 {/* //<div className="grid grid-cols-5 h-full"> */}
-                    <section className=" min-w-[600px] w-full bg-[#303030] row-span-2 rounded-xl break-words">
+                    <section className=" w-full min-h-[400px] min-w-[300px] bg-[#303030]  rounded-xl ">
                         <iframe src={vidUrl} className="w-full h-full rounded-xl " frameBorder="0" allowFullScreen>
-
+                            
                         </iframe>
                     </section>
-                    <div className="min-w-[500px] w-full   max-w-[600px] grid grid-rows-4 row-span-2 gap-2 break-words">
-                        <section className="p-5 min-w-[500px] w-full max-w-[600px] row-span-1 col-span-2 bg-[#303030] rounded-xl" > 
-                            <div className="flex justify-between items-center ">
+                    <div className="max-w-[600px] w-full flex flex-col gap-2  break-words">
+                        <section className="p-5   bg-[#303030] rounded-xl" > 
+                            <div className="flex  justify-between items-center ">
                                 <div className="text-blue-500 text-xl font-semibold mb-5 ">
                                     Progress :
                                 </div>
@@ -74,7 +74,7 @@ const Home = ()=>{
                                     {progress}%
                                 </div>
                             </div>
-                            <div className="w-full bg-gray-200 rounded-full h-2.5 mb-3 ">
+                            <div className="w-full  bg-gray-200 rounded-full h-2.5 mb-3 ">
                                <motion.div
                                  className="bg-blue-600 h-2.5 rounded-full"
                                  animate={{ width: `${progress}%` }}
@@ -82,29 +82,27 @@ const Home = ()=>{
                                ></motion.div>
                              </div>
                         </section>
-                        <Notes vidId />
+                        <section className="h-full ">
+                            <Notes  />
+                        </section>
                     </div>
-                    <section className="col-span-2 rounded-2xl bg-[#303030] min-h-[300px]">
-                       {tasks && (<div className="flex px-10 py-3 justify-between">
-                            <div className="text-3xl tracking-wider font-bold underline underline-offset-4">
-                                Tasks
+                 </section>
+                    <section className=" rounded-2xl border-[#303030] border-1 min-w-[600px] px-1 ">
+                       <div className="flex px-10 py-3 justify-between">
+                            <div className="text-2xl font-bold text-white pt-1 tracking-wider border-b-1 border-[#303030]">
+                                Tasks 
                             </div>
                             
-                        </div>) }
+                        </div>
                         { tasks && 
                             tasks.map((obj,index)=>{
-                                return <motion.div key={index} className="p-4" 
+                                return <motion.div key={index} className="p-2 rounded-xl  " 
                                 initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ duration: 0.5, delay: index * 0.2 }}>
-                                    <div  className=" flex items-center p-2" >
-                                        <input type="checkbox" onChange={toggleTask} className="mx-5 text-white w-4 h-4  border-1 border-black rounded bg-gray-200"></input>
-                                        <div className="mb-1 font-normal text-white">{obj.task_description}</div>
-                                </div>
-                                <div className="">
-                                    <div className=" w-full border-b-2  ">
-
-                                    </div>
+                                    <div  className=" flex items-center bg-[#0a0a0a] py-2 rounded-full border-1 border-[#303030] " >
+                                        <input type="checkbox" onChange={toggleTask} className={`mx-5 text-white w-4 h-4  border-1 border-black rounded bg-gray-200 `}></input>
+                                        <div className="mb-1  tracking-wide text-white">{obj.task_description}</div>
                                 </div>
                                 </motion.div>
                             })
@@ -112,7 +110,6 @@ const Home = ()=>{
                     </section>
                     
                 {/* </div> */}
-              </section>
             </section>
             <div className="fixed left-2/6 right-2/6 top-5/6">
               
@@ -123,7 +120,7 @@ const Home = ()=>{
                         if(Eurl){
                             setUrl(Eurl);
                         }
-                    }}className="outline-none whitespace-normal rounded-4xl w-[400px] p-5 max-h-30  overflow-y-auto resize-none custom-scrollbar"/>
+                    }}className="outline-none whitespace-normal rounded-4xl w-[400px] p-5 max-h-30   resize-none custom-scrollbar"/>
                     <div type="button" onClick={()=>{
                         fetch()
                         
