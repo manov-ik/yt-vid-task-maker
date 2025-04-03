@@ -1,5 +1,6 @@
 from typing import Optional, List
 from datetime import datetime
+
 import os
 from youtube_transcript_api import YouTubeTranscriptApi
 from google import genai
@@ -7,9 +8,11 @@ from google import genai
 import uvicorn
 from fastapi import Depends, FastAPI, HTTPException
 from sqlmodel import Field, Relationship, Session, SQLModel, create_engine , delete
+from fastapi.middleware.cors import CORSMiddleware
 
 from dotenv import load_dotenv
 load_dotenv()
+
 
 client = genai.Client(api_key=os.getenv("GENAI_API_KEY"))
 
@@ -48,6 +51,9 @@ class Notes(SQLModel, table=True):
 
 # Initialize FastAPI App
 app = FastAPI()
+
+origin = {'http://localhost:5173'}
+app.add_middleware(CORSMiddleware,allow_origins=origin)
 
 # Dependency for DB Session
 def get_session():
