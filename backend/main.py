@@ -53,31 +53,36 @@ class Notes(SQLModel, table=True):
 app = FastAPI()
 
 origin = {'http://localhost:5173'}
-app.add_middleware(CORSMiddleware,allow_origins=origin)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],  # Allow frontend
+    allow_credentials=True,
+    allow_methods=["*"],  # Allow all methods
+    allow_headers=["*"],  # Allow all headers
+)
 
 # Dependency for DB Session
 def get_session():
     with Session(engine) as session:
         yield session
 
+
 @app.post("/create-page/", response_model=Pages)
 def create_page(vid_url: str, session: Session = Depends(get_session)):
     try:
         split_index = vid_url.find("=")
-
         if split_index != -1:
             vid_id = vid_url[split_index + 1: split_index + 12]
-            
+        
         print("heyy paaru da")
+        
         # Check if the page already exists with the given vid_id
         existing_page = session.query(Pages).filter(Pages.vid_id == vid_id).first()
         
-        # If the page already exists, raise an HTTPException with a message
         if existing_page:
-            raise HTTPException(status_code=400, detail="Page with this video ID already exists")
-        else:
-        
-            # Fetch transcript
+            return existing_page  # ✅ Return existing page details if found
+        else :
+         # Fetch transcript
             fetched_transcript = YouTubeTranscriptApi().fetch(vid_id)
             text = ""
 
@@ -134,7 +139,7 @@ def create_page(vid_url: str, session: Session = Depends(get_session)):
             return new_page
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    
+
 
 @app.put("/{vid_id}/update-title", response_model=Pages)
 def update_page_title(vid_id: str, title_update: dict, session: Session = Depends(get_session)):
