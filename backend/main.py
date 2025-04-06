@@ -281,6 +281,22 @@ def delete_task(task_id: int, session: Session = Depends(get_session)):
     except Exception as e:
         # If any error occurs, return a 500 server error
         raise HTTPException(status_code=500, detail=str(e))
+    
+@app.get("/{task_id}/get-how-to", response_model=str)
+def get_how_to(task_id: str, session: Session = Depends(get_session)):
+    task = session.query(Tasks).filter(Tasks.id == task_id).first()
+    page_id = task.page_id
+    page = session.query(Pages).filter(Pages.id == page_id).first()
+    page_title = page.title
+    response = client.models.generate_content(
+                model="gemini-2.0-flash",
+                contents = task.task_description + " in " + page_title + "\n" + "explain how to do this in 35 words only the explanation",
+            )
+    
+    task_explain = response.text.strip()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return task_explain
 
 @app.post("/{vid_id}/create-note/", response_model=Notes)
 def create_note(vid_id: str, note: Notes, session: Session = Depends(get_session)):
