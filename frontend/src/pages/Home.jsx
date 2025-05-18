@@ -16,7 +16,7 @@ const Home = () => {
       </div>
       <main className="h-screen bg-black"></main>
       <div className="fixed flex justify-center left-2/6 right-2/6 top-5/6">
-        <div className="h-25 flex flex-col p-2  bg-black min-w-[500px] md:max-w-[700px] rounded-4xl flex flex-wrap">
+        <div className="h-25 flex flex-col p-2  bg-black min-w-[500px] md:max-w-[700px] rounded-4xl flex-wrap">
           <textarea
             type="text"
             placeholder="Search"
